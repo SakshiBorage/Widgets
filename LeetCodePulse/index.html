@@ -1,0 +1,472 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>LeetCode Pulse</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: transparent; overflow: hidden;
+    width: 100%; height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-user-select: none; user-select: none;
+  }
+  .card {
+    position: relative;
+    width: 100vw; height: 100vh;
+    background: rgba(17, 14, 10, 0.92);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 10px 14px 8px;
+    -webkit-app-region: drag;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    color: #e9dfd3;
+    flex: none;
+  }
+  .header .title {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    color: #d97757;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -webkit-app-region: no-drag;
+  }
+  .header .title:hover { text-decoration: underline; }
+  .icons { display: flex; gap: 8px; -webkit-app-region: no-drag; flex: none; }
+  .icon-btn {
+    cursor: pointer; opacity: 0.6; font-size: 13px; background: none;
+    border: none; color: #e9dfd3; padding: 2px 5px; border-radius: 4px; line-height: 1;
+  }
+  .icon-btn:hover { opacity: 1; background: rgba(255,255,255,0.08); }
+
+  .graph { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .months { display: flex; flex: none; color: #9b8f7f; font-size: 10px; }
+  .months .gutter { flex: none; }
+  .months .week-label { flex: none; }
+  .body { flex: 1; min-height: 0; display: flex; flex-direction: row; }
+  .daylabels { flex: none; display: flex; flex-direction: column; color: #9b8f7f; font-size: 10px; margin-right: 4px; }
+  .daylabels .row { display: flex; align-items: center; }
+  #grid { flex: 1; min-width: 0; display: flex; flex-direction: row; }
+  .week { display: flex; flex-direction: column; }
+  .cell { border-radius: 2px; }
+
+  .footer { flex: none; display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+  .status { color: #9b8f7f; font-size: 10px; }
+  .legend { display: flex; align-items: center; gap: 3px; color: #9b8f7f; font-size: 10px; }
+  .legend .cell { width: 9px; height: 9px; }
+
+  .overlay {
+    position: absolute; inset: 0; border-radius: 14px;
+    background: rgba(17, 14, 10, 0.97);
+    display: none; flex-direction: column; justify-content: center;
+    align-items: center; gap: 10px; padding: 16px;
+    -webkit-app-region: no-drag;
+  }
+  .overlay.visible { display: flex; }
+  .overlay input {
+    width: 90%; max-width: 320px; padding: 7px 10px; border-radius: 6px; border: 1px solid #3a3226;
+    background: #110e0a; color: #e9dfd3; font-size: 13px;
+  }
+  .overlay .row { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; width: 90%; max-width: 320px; }
+  .overlay label { font-size: 11px; color: #9b8f7f; }
+  .overlay .actions { display: flex; gap: 8px; margin-top: 4px; }
+  .overlay button.primary {
+    background: #d97757; color: #1a1a1a; border: none; padding: 7px 16px;
+    border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: 600;
+  }
+  .overlay button.secondary {
+    background: transparent; color: #9b8f7f; border: 1px solid #3a3226; padding: 7px 16px;
+    border-radius: 6px; font-size: 13px; cursor: pointer;
+  }
+  .overlay .link { color: #d97757; font-size: 11px; cursor: pointer; }
+  .overlay .error { color: #f85149; font-size: 12px; min-height: 14px; }
+
+  .months .week-label.clickable { cursor: pointer; -webkit-app-region: no-drag; }
+  .months .week-label.clickable:hover { color: #d97757; text-decoration: underline; }
+
+  .month-header { display: flex; align-items: center; width: 100%; color: #e9dfd3; flex: none; margin-bottom: 6px; }
+  .month-header .month-title { flex: 1; text-align: center; font-size: 13px; font-weight: 600; }
+  .month-header .month-header-right { display: flex; gap: 4px; }
+  .month-weekdays {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    width: 100%; flex: none; color: #9b8f7f; font-size: 10px; text-align: center;
+  }
+  .month-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr;
+    gap: 3px; width: 100%; flex: 1; min-height: 0; margin-top: 4px;
+  }
+  .month-day {
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 3px; font-size: 10px; color: rgba(233,223,211,0.85);
+  }
+  .month-day.empty { visibility: hidden; }
+  .month-footer { flex: none; margin-top: 6px; color: #9b8f7f; font-size: 10px; text-align: center; }
+
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="title" id="titleLabel">LeetCode Pulse</div>
+      <div class="icons">
+        <button class="icon-btn" id="refreshBtn" title="Refresh now">&#8635;</button>
+        <button class="icon-btn" id="settingsBtn" title="Settings">&#9881;</button>
+      </div>
+    </div>
+    <div class="graph">
+      <div class="months" id="months"></div>
+      <div class="body">
+        <div class="daylabels" id="daylabels"></div>
+        <div id="grid"></div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="status" id="status"></div>
+      <div class="legend">
+        <span>Less</span>
+        <span class="cell" style="background:#30363d"></span>
+        <span class="cell" style="background:#52332a"></span>
+        <span class="cell" style="background:#8a4a38"></span>
+        <span class="cell" style="background:#c06550"></span>
+        <span class="cell" style="background:#d97757"></span>
+        <span>More</span>
+      </div>
+    </div>
+
+    <div class="overlay" id="setup">
+      <div class="row">
+        <label>LeetCode username</label>
+        <input id="usernameInput" type="text" placeholder="leetcode" />
+      </div>
+      <div class="error" id="setupError"></div>
+      <div class="actions">
+        <button class="secondary" id="cancelBtn">Cancel</button>
+        <button class="primary" id="saveBtn">Save</button>
+      </div>
+      <div class="link" id="profileLink">Find your username on LeetCode &rarr;</div>
+    </div>
+
+    <div class="overlay" id="monthView">
+      <div class="month-header">
+        <button class="icon-btn" id="monthPrevBtn" title="Previous month">&#8249;</button>
+        <div class="month-title" id="monthTitle"></div>
+        <div class="month-header-right">
+          <button class="icon-btn" id="monthNextBtn" title="Next month">&#8250;</button>
+          <button class="icon-btn" id="monthCloseBtn" title="Close">&#10005;</button>
+        </div>
+      </div>
+      <div class="month-weekdays" id="monthWeekdays"></div>
+      <div class="month-grid" id="monthGrid"></div>
+      <div class="month-footer" id="monthFooter"></div>
+    </div>
+  </div>
+
+<script>
+  const gridEl = document.getElementById('grid');
+  const monthsEl = document.getElementById('months');
+  const dayLabelsEl = document.getElementById('daylabels');
+  const statusEl = document.getElementById('status');
+  const titleLabel = document.getElementById('titleLabel');
+  const setupEl = document.getElementById('setup');
+  const usernameInput = document.getElementById('usernameInput');
+  const setupError = document.getElementById('setupError');
+  const monthViewEl = document.getElementById('monthView');
+  const monthTitleEl = document.getElementById('monthTitle');
+  const monthWeekdaysEl = document.getElementById('monthWeekdays');
+  const monthGridEl = document.getElementById('monthGrid');
+  const monthFooterEl = document.getElementById('monthFooter');
+  const monthPrevBtn = document.getElementById('monthPrevBtn');
+  const monthNextBtn = document.getElementById('monthNextBtn');
+  const monthCloseBtn = document.getElementById('monthCloseBtn');
+
+  const SPACING = 3;
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const WEEKDAY_LETTERS = ['S','M','T','W','T','F','S'];
+  let lastPayload = null;
+  let rafPending = false;
+  let monthView = null; // { year, month }
+
+  function intensity(count) {
+    if (count === undefined || count === null) return -1;
+    if (count === 0) return 0;
+    if (count <= 2) return 1;
+    if (count <= 4) return 2;
+    if (count <= 7) return 3;
+    return 4;
+  }
+
+  const COLORS = [
+    'rgba(255,255,255,0)',
+    '#30363d',
+    '#52332a',
+    '#8a4a38',
+    '#c06550',
+    '#d97757',
+  ];
+
+  function colorFor(count) { return COLORS[intensity(count) + 1]; }
+
+  function openSetup(prefill) {
+    setupError.textContent = '';
+    usernameInput.value = (prefill && prefill.username) || usernameInput.value || '';
+    setupEl.classList.add('visible');
+    usernameInput.focus();
+  }
+  function closeSetup() { setupEl.classList.remove('visible'); }
+
+  function weeksFrom(days) {
+    const weeks = [];
+    let current = [];
+    for (const d of days) {
+      current.push(d);
+      if (current.length === 7) { weeks.push(current); current = []; }
+    }
+    if (current.length) {
+      while (current.length < 7) current.push({ date: null, count: null });
+      weeks.push(current);
+    }
+    return weeks;
+  }
+
+  function render(days) {
+    gridEl.innerHTML = '';
+    monthsEl.innerHTML = '';
+    dayLabelsEl.innerHTML = '';
+    if (!days || !days.length) return;
+
+    const availableHeight = gridEl.parentElement.getBoundingClientRect().height;
+    const gutterWidth = 24;
+    const cardWidth = document.querySelector('.card').getBoundingClientRect().width;
+    const availableWidth = cardWidth - 28 - gutterWidth; // padding + gutter
+
+    const cellSize = Math.max(4, (availableHeight - SPACING * 6) / 7);
+    const weekWidth = cellSize + SPACING;
+    const maxWeeks = Math.floor(availableWidth / weekWidth);
+    const weeksToShow = Math.max(1, Math.min(maxWeeks, 53));
+
+    const last = new Date(days[days.length - 1].date + 'T00:00:00');
+    const weekday = last.getDay(); // 0 = Sunday
+    const totalDaysNeeded = weeksToShow * 7 + (weekday + 1);
+    const slice = days.slice(Math.max(0, days.length - totalDaysNeeded));
+    const weeks = weeksFrom(slice);
+
+    // day-of-week labels (Mon / Wed / Fri), aligned to grid rows
+    dayLabelsEl.style.gap = SPACING + 'px';
+    dayLabelsEl.style.width = gutterWidth + 'px';
+    const rowLabels = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
+    for (let i = 0; i < 7; i++) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.style.height = cellSize + 'px';
+      row.textContent = rowLabels[i];
+      dayLabelsEl.appendChild(row);
+    }
+
+    // month labels, aligned to week columns
+    monthsEl.style.gap = SPACING + 'px';
+    const gutter = document.createElement('div');
+    gutter.className = 'gutter';
+    gutter.style.width = gutterWidth + 'px';
+    monthsEl.appendChild(gutter);
+    let prevMonth = null;
+    for (const week of weeks) {
+      const firstDay = week.find((d) => d.date);
+      const label = document.createElement('div');
+      label.className = 'week-label';
+      label.style.width = cellSize + 'px';
+      if (firstDay) {
+        const d = new Date(firstDay.date + 'T00:00:00');
+        const m = d.getMonth();
+        if (m !== prevMonth) {
+          label.textContent = MONTHS[m];
+          prevMonth = m;
+          label.classList.add('clickable');
+          label.addEventListener('click', () => openMonthView(d.getFullYear(), m));
+        }
+      }
+      monthsEl.appendChild(label);
+    }
+
+    // submission grid
+    gridEl.style.gap = SPACING + 'px';
+    for (const week of weeks) {
+      const col = document.createElement('div');
+      col.className = 'week';
+      col.style.gap = SPACING + 'px';
+      for (const day of week) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.style.width = cellSize + 'px';
+        cell.style.height = cellSize + 'px';
+        cell.style.background = colorFor(day.count);
+        if (day.date) cell.title = `${day.date}: ${day.count} submission${day.count === 1 ? '' : 's'}`;
+        col.appendChild(cell);
+      }
+      gridEl.appendChild(col);
+    }
+  }
+
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  function monthRange() {
+    if (!lastPayload || !lastPayload.days.length) return null;
+    const [fy, fm] = lastPayload.days[0].date.split('-').map(Number);
+    const [ly, lm] = lastPayload.days[lastPayload.days.length - 1].date.split('-').map(Number);
+    return { min: fy * 12 + (fm - 1), max: ly * 12 + (lm - 1) };
+  }
+
+  function renderMonthView() {
+    if (!monthView || !lastPayload) return;
+    const { year, month } = monthView;
+    monthTitleEl.textContent = `${MONTHS[month]} ${year}`;
+
+    if (!monthWeekdaysEl.childElementCount) {
+      for (const letter of WEEKDAY_LETTERS) {
+        const el = document.createElement('div');
+        el.textContent = letter;
+        monthWeekdaysEl.appendChild(el);
+      }
+    }
+
+    const dataMap = {};
+    for (const d of lastPayload.days) dataMap[d.date] = d.count;
+
+    monthGridEl.innerHTML = '';
+    const firstWeekday = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    for (let i = 0; i < firstWeekday; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'month-day empty';
+      monthGridEl.appendChild(cell);
+    }
+
+    let total = 0;
+    let activeDays = 0;
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${pad2(month + 1)}-${pad2(day)}`;
+      const count = dataMap[dateStr];
+      if (count) { total += count; activeDays++; }
+      const cell = document.createElement('div');
+      cell.className = 'month-day';
+      cell.style.background = colorFor(count);
+      cell.textContent = day;
+      cell.title = count === undefined ? dateStr : `${dateStr}: ${count} submission${count === 1 ? '' : 's'}`;
+      monthGridEl.appendChild(cell);
+    }
+
+    monthFooterEl.textContent = `${total} submission${total === 1 ? '' : 's'} · ${activeDays} active day${activeDays === 1 ? '' : 's'}`;
+
+    const range = monthRange();
+    const idx = year * 12 + month;
+    monthPrevBtn.style.visibility = range && idx <= range.min ? 'hidden' : 'visible';
+    monthNextBtn.style.visibility = range && idx >= range.max ? 'hidden' : 'visible';
+  }
+
+  function openMonthView(year, month) {
+    if (!lastPayload) return;
+    monthView = { year, month };
+    renderMonthView();
+    monthViewEl.classList.add('visible');
+  }
+
+  function closeMonthView() {
+    monthViewEl.classList.remove('visible');
+    monthView = null;
+  }
+
+  function shiftMonthView(delta) {
+    if (!monthView) return;
+    let { year, month } = monthView;
+    month += delta;
+    if (month < 0) { month = 11; year--; }
+    else if (month > 11) { month = 0; year++; }
+    monthView = { year, month };
+    renderMonthView();
+  }
+
+  monthPrevBtn.addEventListener('click', () => shiftMonthView(-1));
+  monthNextBtn.addEventListener('click', () => shiftMonthView(1));
+  monthCloseBtn.addEventListener('click', closeMonthView);
+
+  function scheduleRender() {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(() => {
+      rafPending = false;
+      if (lastPayload && lastPayload.days) render(lastPayload.days);
+    });
+  }
+
+  function timeAgo(ts) {
+    const s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    return `${Math.floor(s / 3600)}h ago`;
+  }
+
+  window.widget.onContrib((data) => {
+    if (data.error) {
+      statusEl.textContent = data.error;
+      gridEl.innerHTML = '';
+      monthsEl.innerHTML = '';
+      dayLabelsEl.innerHTML = '';
+      lastPayload = null;
+      return;
+    }
+    titleLabel.textContent = `${data.totalSolved} solved · ${data.streak}-day streak`;
+    titleLabel.dataset.username = data.username;
+    lastPayload = data;
+    render(data.days);
+    statusEl.textContent = `${data.totalActiveDays} active days · Updated ${timeAgo(data.updatedAt)}`;
+  });
+
+  window.widget.onNeedSetup((data) => {
+    if (data && data.username) titleLabel.textContent = data.username;
+    openSetup(data);
+  });
+
+  document.getElementById('refreshBtn').addEventListener('click', () => window.widget.refresh());
+  document.getElementById('settingsBtn').addEventListener('click', async () => {
+    const cfg = await window.widget.getConfig();
+    openSetup(cfg);
+  });
+  document.getElementById('cancelBtn').addEventListener('click', closeSetup);
+  document.getElementById('profileLink').addEventListener('click', () => {
+    const u = usernameInput.value.trim();
+    window.widget.openExternal(u ? `https://leetcode.com/${u}/` : 'https://leetcode.com/');
+  });
+  titleLabel.addEventListener('click', async () => {
+    const cfg = await window.widget.getConfig();
+    if (cfg.username) window.widget.openExternal(`https://leetcode.com/${cfg.username}/`);
+  });
+  document.getElementById('saveBtn').addEventListener('click', async () => {
+    setupError.textContent = 'Saving...';
+    const res = await window.widget.saveConfig({ username: usernameInput.value.trim() });
+    if (res.ok) {
+      closeSetup();
+    } else {
+      setupError.textContent = res.error;
+    }
+  });
+
+  window.addEventListener('load', async () => {
+    const cfg = await window.widget.getConfig();
+    if (!cfg.username) openSetup(cfg);
+    else titleLabel.textContent = cfg.username;
+  });
+
+  new ResizeObserver(scheduleRender).observe(document.querySelector('.card'));
+</script>
+</body>
+</html>

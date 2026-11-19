@@ -1,0 +1,348 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>GitHub Pulse</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: transparent; overflow: hidden;
+    width: 100%; height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-user-select: none; user-select: none;
+  }
+  .card {
+    position: relative;
+    width: 100vw; height: 100vh;
+    background: rgba(13, 17, 23, 0.92);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 10px 14px 8px;
+    -webkit-app-region: drag;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    color: #c9d1d9;
+    flex: none;
+  }
+  .header .title {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -webkit-app-region: no-drag;
+  }
+  .header .title:hover { text-decoration: underline; }
+  .icons { display: flex; gap: 8px; -webkit-app-region: no-drag; flex: none; }
+  .icon-btn {
+    cursor: pointer; opacity: 0.6; font-size: 13px; background: none;
+    border: none; color: #c9d1d9; padding: 2px 5px; border-radius: 4px; line-height: 1;
+  }
+  .icon-btn:hover { opacity: 1; background: rgba(255,255,255,0.08); }
+
+  .graph { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .months { display: flex; flex: none; color: #8b949e; font-size: 10px; }
+  .months .gutter { flex: none; }
+  .months .week-label { flex: none; }
+  .body { flex: 1; min-height: 0; display: flex; flex-direction: row; }
+  .daylabels { flex: none; display: flex; flex-direction: column; color: #8b949e; font-size: 10px; margin-right: 4px; }
+  .daylabels .row { display: flex; align-items: center; }
+  #grid { flex: 1; min-width: 0; display: flex; flex-direction: row; }
+  .week { display: flex; flex-direction: column; }
+  .cell { border-radius: 2px; }
+
+  .footer { flex: none; display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+  .status { color: #8b949e; font-size: 10px; }
+  .legend { display: flex; align-items: center; gap: 3px; color: #8b949e; font-size: 10px; }
+  .legend .cell { width: 9px; height: 9px; }
+
+  .overlay {
+    position: absolute; inset: 0; border-radius: 14px;
+    background: rgba(13, 17, 23, 0.97);
+    display: none; flex-direction: column; justify-content: center;
+    align-items: center; gap: 10px; padding: 16px;
+    -webkit-app-region: no-drag;
+  }
+  .overlay.visible { display: flex; }
+  .overlay input {
+    width: 90%; max-width: 320px; padding: 7px 10px; border-radius: 6px; border: 1px solid #30363d;
+    background: #0d1117; color: #c9d1d9; font-size: 13px;
+  }
+  .overlay .row { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; width: 90%; max-width: 320px; }
+  .overlay label { font-size: 11px; color: #8b949e; }
+  .overlay .actions { display: flex; gap: 8px; margin-top: 4px; }
+  .overlay button.primary {
+    background: #238636; color: white; border: none; padding: 7px 16px;
+    border-radius: 6px; font-size: 13px; cursor: pointer;
+  }
+  .overlay button.secondary {
+    background: transparent; color: #8b949e; border: 1px solid #30363d; padding: 7px 16px;
+    border-radius: 6px; font-size: 13px; cursor: pointer;
+  }
+  .overlay .link { color: #58a6ff; font-size: 11px; cursor: pointer; }
+  .overlay .error { color: #f85149; font-size: 12px; min-height: 14px; }
+
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="title" id="titleLabel">GitHub Pulse</div>
+      <div class="icons">
+        <button class="icon-btn" id="refreshBtn" title="Refresh now">&#8635;</button>
+        <button class="icon-btn" id="settingsBtn" title="Settings">&#9881;</button>
+      </div>
+    </div>
+    <div class="graph">
+      <div class="months" id="months"></div>
+      <div class="body">
+        <div class="daylabels" id="daylabels"></div>
+        <div id="grid"></div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="status" id="status"></div>
+      <div class="legend">
+        <span>Less</span>
+        <span class="cell" style="background:#27303a"></span>
+        <span class="cell" style="background:#0e4429"></span>
+        <span class="cell" style="background:#006d32"></span>
+        <span class="cell" style="background:#26a641"></span>
+        <span class="cell" style="background:#39d353"></span>
+        <span>More</span>
+      </div>
+    </div>
+
+    <div class="overlay" id="setup">
+      <div class="row">
+        <label>GitHub username</label>
+        <input id="usernameInput" type="text" placeholder="octocat" />
+      </div>
+      <div class="row">
+        <label>Personal access token (classic, scope: read:user)</label>
+        <input id="tokenInput" type="password" placeholder="ghp_..." />
+      </div>
+      <div class="error" id="setupError"></div>
+      <div class="actions">
+        <button class="secondary" id="cancelBtn">Cancel</button>
+        <button class="primary" id="saveBtn">Save</button>
+      </div>
+      <div class="link" id="tokenLink">Generate a token on GitHub &rarr;</div>
+    </div>
+  </div>
+
+<script>
+  const gridEl = document.getElementById('grid');
+  const monthsEl = document.getElementById('months');
+  const dayLabelsEl = document.getElementById('daylabels');
+  const statusEl = document.getElementById('status');
+  const titleLabel = document.getElementById('titleLabel');
+  const setupEl = document.getElementById('setup');
+  const usernameInput = document.getElementById('usernameInput');
+  const tokenInput = document.getElementById('tokenInput');
+  const setupError = document.getElementById('setupError');
+
+  const SPACING = 3;
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let lastPayload = null;
+  let rafPending = false;
+
+  function intensity(count) {
+    if (count === undefined || count === null) return -1;
+    if (count === 0) return 0;
+    if (count <= 3) return 1;
+    if (count <= 6) return 2;
+    if (count <= 10) return 3;
+    return 4;
+  }
+
+  const COLORS = [
+    'rgba(255,255,255,0)',
+    '#27303a',
+    '#0e4429',
+    '#006d32',
+    '#26a641',
+    '#39d353',
+  ];
+
+  function colorFor(count) { return COLORS[intensity(count) + 1]; }
+
+  function openSetup(prefill) {
+    setupError.textContent = '';
+    usernameInput.value = (prefill && prefill.username) || usernameInput.value || '';
+    tokenInput.value = '';
+    setupEl.classList.add('visible');
+    usernameInput.focus();
+  }
+  function closeSetup() { setupEl.classList.remove('visible'); }
+
+  function weeksFrom(days) {
+    const weeks = [];
+    let current = [];
+    for (const d of days) {
+      current.push(d);
+      if (current.length === 7) { weeks.push(current); current = []; }
+    }
+    if (current.length) {
+      while (current.length < 7) current.push({ date: null, count: null });
+      weeks.push(current);
+    }
+    return weeks;
+  }
+
+  function render(days) {
+    gridEl.innerHTML = '';
+    monthsEl.innerHTML = '';
+    dayLabelsEl.innerHTML = '';
+    if (!days || !days.length) return;
+
+    const availableHeight = gridEl.parentElement.getBoundingClientRect().height;
+    const gutterWidth = 24;
+    const cardWidth = document.querySelector('.card').getBoundingClientRect().width;
+    const availableWidth = cardWidth - 28 - gutterWidth; // padding + gutter
+
+    const cellSize = Math.max(4, (availableHeight - SPACING * 6) / 7);
+    const weekWidth = cellSize + SPACING;
+    const maxWeeks = Math.floor(availableWidth / weekWidth);
+    const weeksToShow = Math.max(1, Math.min(maxWeeks, 53));
+
+    const last = new Date(days[days.length - 1].date + 'T00:00:00');
+    const weekday = last.getDay(); // 0 = Sunday
+    const totalDaysNeeded = weeksToShow * 7 + (weekday + 1);
+    const slice = days.slice(Math.max(0, days.length - totalDaysNeeded));
+    const weeks = weeksFrom(slice);
+
+    // day-of-week labels (Mon / Wed / Fri), aligned to grid rows
+    dayLabelsEl.style.gap = SPACING + 'px';
+    dayLabelsEl.style.width = gutterWidth + 'px';
+    const rowLabels = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
+    for (let i = 0; i < 7; i++) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.style.height = cellSize + 'px';
+      row.textContent = rowLabels[i];
+      dayLabelsEl.appendChild(row);
+    }
+
+    // month labels, aligned to week columns
+    monthsEl.style.gap = SPACING + 'px';
+    const gutter = document.createElement('div');
+    gutter.className = 'gutter';
+    gutter.style.width = gutterWidth + 'px';
+    monthsEl.appendChild(gutter);
+    let prevMonth = null;
+    for (const week of weeks) {
+      const firstDay = week.find((d) => d.date);
+      const label = document.createElement('div');
+      label.className = 'week-label';
+      label.style.width = cellSize + 'px';
+      if (firstDay) {
+        const d = new Date(firstDay.date + 'T00:00:00');
+        const m = d.getMonth();
+        if (m !== prevMonth) {
+          label.textContent = MONTHS[m];
+          prevMonth = m;
+        }
+      }
+      monthsEl.appendChild(label);
+    }
+
+    // contribution grid
+    gridEl.style.gap = SPACING + 'px';
+    for (const week of weeks) {
+      const col = document.createElement('div');
+      col.className = 'week';
+      col.style.gap = SPACING + 'px';
+      for (const day of week) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.style.width = cellSize + 'px';
+        cell.style.height = cellSize + 'px';
+        cell.style.background = colorFor(day.count);
+        if (day.date) cell.title = `${day.date}: ${day.count} contribution${day.count === 1 ? '' : 's'}`;
+        col.appendChild(cell);
+      }
+      gridEl.appendChild(col);
+    }
+  }
+
+  function scheduleRender() {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(() => {
+      rafPending = false;
+      if (lastPayload && lastPayload.days) render(lastPayload.days);
+    });
+  }
+
+  function timeAgo(ts) {
+    const s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    return `${Math.floor(s / 3600)}h ago`;
+  }
+
+  window.widget.onContrib((data) => {
+    if (data.error) {
+      statusEl.textContent = data.error;
+      gridEl.innerHTML = '';
+      monthsEl.innerHTML = '';
+      dayLabelsEl.innerHTML = '';
+      lastPayload = null;
+      return;
+    }
+    const total = data.days.reduce((sum, d) => sum + (d.count || 0), 0);
+    titleLabel.textContent = `${total} contributions in the last year`;
+    titleLabel.dataset.username = data.username;
+    lastPayload = data;
+    render(data.days);
+    statusEl.textContent = `Updated ${timeAgo(data.updatedAt)}`;
+  });
+
+  window.widget.onNeedSetup((data) => {
+    if (data && data.username) titleLabel.textContent = data.username;
+    openSetup(data);
+  });
+
+  document.getElementById('refreshBtn').addEventListener('click', () => window.widget.refresh());
+  document.getElementById('settingsBtn').addEventListener('click', async () => {
+    const cfg = await window.widget.getConfig();
+    openSetup(cfg);
+  });
+  document.getElementById('cancelBtn').addEventListener('click', closeSetup);
+  document.getElementById('tokenLink').addEventListener('click', () => {
+    window.widget.openExternal('https://github.com/settings/tokens');
+  });
+  titleLabel.addEventListener('click', async () => {
+    const cfg = await window.widget.getConfig();
+    if (cfg.username) window.widget.openExternal(`https://github.com/${cfg.username}`);
+  });
+  document.getElementById('saveBtn').addEventListener('click', async () => {
+    setupError.textContent = 'Saving...';
+    const res = await window.widget.saveConfig({ username: usernameInput.value.trim(), token: tokenInput.value.trim() });
+    if (res.ok) {
+      closeSetup();
+    } else {
+      setupError.textContent = res.error;
+    }
+  });
+
+  window.addEventListener('load', async () => {
+    const cfg = await window.widget.getConfig();
+    if (!cfg.username) openSetup(cfg);
+    else titleLabel.textContent = cfg.username;
+  });
+
+  new ResizeObserver(scheduleRender).observe(document.querySelector('.card'));
+</script>
+</body>
+</html>
